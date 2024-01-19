@@ -1,0 +1,28 @@
+version: "3.9"
+services:
+
+  mev-boost:
+    image: "flashbots/mev-boost:latest"
+    command:
+      - -relay-check
+      - -addr=0.0.0.0:18550
+      - -debug
+      - -genesis-fork-version=0x20000089
+      - -relays=http://0xa55c1285d84ba83a5ad26420cd5ad3091e49c55a813eee651cd467db38a8c8e63192f47955e9376f6b42f6d190571cb5@172.23.0.15:9062
+      - -request-timeout-getheader=2000
+      - -request-timeout-getpayload=4000
+      - -request-timeout-regval=3000
+    environment:
+      - SKIP_RELAY_SIGNATURE_CHECK=1
+    ports:
+      - 18550:18550
+    networks:
+      pleasework:
+        ipv4_address: 172.23.0.5
+    # labels:
+    #   - "com.docker-tc.enabled=1"
+    #   - "com.docker-tc.loss=50%"
+
+networks:
+  pleasework:
+    external: true

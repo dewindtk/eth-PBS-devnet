@@ -1,0 +1,7 @@
+FROM golang:latest
+
+WORKDIR /go/src/app
+
+COPY . .
+
+CMD ["go", "run", ".","housekeeper", "--network", "custom", "--beacon-uris", "http://172.23.0.6:3501", "--db", "postgres://postgres:postgres@172.23.0.12:5432/postgres?sslmode=disable"]

@@ -1,0 +1,18 @@
+{
+  "proposer_config": {
+    "0x0123456748ed887f6c4c6adf334070efcd75140eada5ac83a92506dd7a057816155ad77931185101128655c0191bd021": {
+      "fee_recipient": "0x123463a4b065722e99115d6c222f267d9cabb524",
+      "builder": {
+        "enabled": true,
+        "gas_limit": "30000000"
+      }
+    }
+  },
+  "default_config": {
+    "fee_recipient": "0x123463a4b065722e99115d6c222f267d9cabb524",
+    "builder": {
+      "enabled": true,
+      "gas_limit": "30000000"
+    }
+  }
+}

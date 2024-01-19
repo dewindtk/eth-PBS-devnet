@@ -1,0 +1,184 @@
+version: "3.9"
+services:
+  # #Creates a genesis state for the beacon chain using a YAML configuration file and
+  # # a deterministic set of 64 validators.
+  # create-beacon-chain-genesis:
+  #   image: "gcr.io/prysmaticlabs/prysm/cmd/prysmctl:HEAD-ec954e"
+  #   command:
+  #     - testnet
+  #     - generate-genesis
+  #     - --fork=capella
+  #     - --num-validators=64
+  #     #- --genesis-time-delay=15
+  #     - --output-ssz=/consensus/genesis.ssz
+  #     - --chain-config-file=/consensus/config.yml
+  #     - --geth-genesis-json-in=/execution/genesis.json
+  #     - --geth-genesis-json-out=/execution/genesis.json
+  #   volumes:
+  #     - ./consensus:/consensus
+  #     - ./execution:/execution
+
+  # Sets up the genesis configuration for the go-ethereum client from a JSON file.
+  geth-genesis:
+    image: "ethereum/client-go:latest"
+    command: --datadir=/execution init /execution/genesis.json
+    volumes:
+      - ./execution:/execution
+      - ./execution/genesis.json:/execution/genesis.json
+    # depends_on:
+    #   create-beacon-chain-genesis:
+    #     condition: service_completed_successfully
+
+  # Runs a Prysm beacon chain from a specified genesis state created in the previous step
+  # and connects to go-ethereum in the same network as the execution client.
+  # The account used in go-ethereum is set as the suggested fee recipient for transactions
+  # proposed via the validators attached to the beacon node.
+  beacon-chain:
+    image: "gcr.io/prysmaticlabs/prysm/beacon-chain:latest"
+    command:
+      - --datadir=/consensus/beacondata
+      # No peers to sync with in this testnet, so setting to 0
+      - --min-sync-peers=1
+      # - --genesis-state=/consensus/genesis.ssz
+      - --bootstrap-node=
+      # - --interop-eth1data-votes
+      # The chain configuration file used for setting up Prysm
+      - --chain-config-file=/consensus/config.yml
+      - --config-file=/consensus/config.yml
+      # We specify the chain id used by our execution client
+      # - --contract-deployment-block=0
+      - --chain-id=32382
+      - --rpc-host=0.0.0.0
+      - --grpc-gateway-host=0.0.0.0
+      - --monitoring-host=0.0.0.0
+      - --rpc-port=4004
+      - --p2p-tcp-port=13004
+      - --p2p-udp-port=12004
+      - --rpc-host=0.0.0.0
+      - --monitoring-port=8084
+      - --grpc-gateway-port=3504
+      - --monitoring-port=8004
+      - --execution-endpoint=http://172.23.0.24:8601
+      - --accept-terms-of-use
+      - --jwt-secret=/execution/jwtsecret
+      - --suggested-fee-recipient=bfeeb021f3f8b620826937c222e304b2961a5eb9
+      - --enable-debug-rpc-endpoints
+      - --peer=/ip4/172.23.0.3/tcp/13000/p2p/16Uiu2HAmJDkyLrfdxEBWkv13GG5hFZ3P3RA3oxL7JN6HtGCwz5eZ
+      - --clear-db
+      - --force-clear-db
+      - --enable-debug-rpc-endpoints
+      - --checkpoint-sync-url=172.23.0.3:3500
+      - --genesis-beacon-api-url=172.23.0.3:3500
+      - --verbosity=debug
+      - --prepare-all-payloads
+
+    # depends_on:
+    #   create-beacon-chain-genesis:
+    #     condition: service_completed_successfully
+    ports:
+      - 8084:8084
+      - 4004:4004
+      - 8004:8004
+      - 3504:3504
+      # - 6060:6060
+      # - 9090:9090
+      - 13004:13004
+      - 12004:12004
+    volumes:
+      - ./consensus:/consensus
+      - ./execution:/execution
+      - ./execution/jwtsecret:/execution/jwtsecret
+    networks: 
+      pleasework:
+          ipv4_address: 172.23.0.23
+
+  # Runs the go-ethereum execution client with the specified, unlocked account and necessary
+  # APIs to allow for proof-of-stake consensus via Prysm.
+  geth:
+    # image: "boost-builder"
+    # image: "flashbots/builder:latest"
+    image: "boost-builder-debug"
+    # entrypoint: init /execution/genesis.json
+    command:
+      - --builder
+      - --builder.beacon_endpoints=http://172.23.0.23:3504
+      - --builder.bellatrix_fork_version=0x20000091
+      - --builder.genesis_fork_version=0x20000089
+      - --builder.genesis_validators_root=0x83431ec7fcf92cfc44947fc0418e831c25e1d0806590231c439830db7ad54fda
+      - --builder.listen_addr=0.0.0.0:28545
+      # --builder.local_relay
+      - --builder.remote_relay_endpoint=http://0xa15b52576bcbf1072f4a011c0f99f9fb6c66f3e1ff321f11f461d15e31b1cb359caa092c71bbded0bae5b5ea401aab7e@172.23.0.35:9063
+      - --builder.secret_key=0x2fc12ae741f29701f8e30f5de6350766c020cb80768a0ff01e6838ffd2431e11
+      # - --builder.validator_checks
+      - --builder.relay_secret_key=0x2fc12ae741f29701f8e30f5de6350766c020cb80768a0ff01e6838ffd2431e11
+      # - --builder.dry-run=false
+      - --builder.algotype=greedy
+      # - --builder.slots_in_epoch=6
+      # - --builder.submission_offset=4s
+      #########################################################
+      - --http
+      - --http.api=engine,eth,web3,net,debug,flashbots,admin
+      - --http.addr=0.0.0.0
+      - --http.corsdomain=*
+      - --ws
+      - --ws.api=engine,eth,web3,net,debug,flashbots,admin
+      - --ws.addr=0.0.0.0
+      - --ws.origins=*
+      - --authrpc.vhosts=*
+      - --authrpc.addr=0.0.0.0
+      - --authrpc.jwtsecret=/execution/jwtsecret
+      - --datadir=/execution
+      - --allow-insecure-unlock
+      - --unlock=bfeeb021f3f8b620826937c222e304b2961a5eb9,2635f34099272d7232edf74be184a922b4ba12fd,124a35b68b409f73d8ccf5a0c9fa0c4b4d282299,2f680e617db77623bf3ed7b5b142ee47c099bfa0,051737c2ebd3ef38ada6900fa399f62c0aa0694b,bd4ed6425c04facd2d254e8dd05e43ea29eab585,0879a76817bfba1c75d2b8ede79023dcf0a3013e,475db58cd202e3530943019fc821999e82da0c22,722821c7b310d52456ab91d615a0f2fb3a0fb86b,ae736c8e04068d4824ad72babfd3af0e10b90281,a668440fbeda974f466e73b6fcc9e7285022f054,227bad465465968bbbbe469485bbc0c725fe5363
+      - --password=/execution/geth_password.txt
+      - --nodiscover
+      - --syncmode=full
+      - --authrpc.port=8601
+      - --http.port=8558
+      - --ws.port=8559
+      - --port=30307
+      - --discovery.port=30307
+      - --verbosity=5
+      - --bootnodes=enode://566055047ba994f3a866947a47e53b1b39ee640fe233167e05b2d06fd8471855541438d33af5373a3559c7cefdcd3b5276eb628d1960dcdaa6e762ae31f5ad60@172.23.0.2:30303?discport=0
+    ports:
+      - 8601:8601
+      - 8558:8558
+      - 8559:8559
+      - 30307:30307
+    environment:
+      - BUILDER_TX_SIGNING_KEY=0x2fc12ae741f29701f8e30f5de6350766c020cb80768a0ff01e6838ffd2431e11
+    depends_on:
+      geth-genesis:
+        condition: service_completed_successfully
+      beacon-chain:
+        condition: service_started
+    volumes:
+      - ./execution:/execution
+      - ./execution/jwtsecret:/execution/jwtsecret
+      - ./execution/geth_password.txt:/execution/geth_password.txt
+    networks: 
+      pleasework:
+        ipv4_address: 172.23.0.24
+
+  # We run a validator client with 64, deterministically-generated keys that match
+  # The validator keys present in the beacon chain genesis state generated a few steps above.
+  # validator:
+  #   image: "gcr.io/prysmaticlabs/prysm/validator:v4.0.8"
+  #   command:
+  #     - --beacon-rpc-provider=beacon-chain:4002
+  #     - --datadir=/consensus/validatordata
+  #     - --accept-terms-of-use
+  #     - --interop-num-validators=64
+  #     - --interop-start-index=0
+  #     - --chain-config-file=/consensus/config.yml
+  #   depends_on:
+  #     beacon-chain:
+  #       condition: service_started
+  #   volumes:
+  #     - ./consensus:/consensus
+  #   networks: 
+  #     - pleasework
+
+networks:
+  pleasework:
+    external: true

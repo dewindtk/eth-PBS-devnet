@@ -1,0 +1,9 @@
+FROM golang:latest
+
+WORKDIR /go/src/app
+
+COPY . .
+COPY vendor/ /go/src/app/vendor/
+
+
+CMD ["go", "run", ".","website", "--network", "custom", "--db", "postgres://postgres:postgres@172.23.0.32:5433/postgres?sslmode=disable"]

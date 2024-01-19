@@ -1,0 +1,128 @@
+version: '3.1'
+
+volumes:
+  psql_data:
+    driver: local
+
+services:
+  redis:
+    image: relay_redis
+    restart: always
+    volumes:
+      - ./redis:/usr/local/etc/redis
+      - ./data:/data
+    ports:
+      - '6379:6379'
+    networks:
+      pleasework:
+        ipv4_address: 172.23.0.10
+
+  memcached:
+    image: memcached
+    restart: always
+    ports:
+      - '11211:11211'
+    networks:
+      pleasework:
+        ipv4_address: 172.23.0.11
+
+  db:
+    image: postgres
+    restart: always
+    volumes:
+      - 'psql_data:/var/lib/postgresql/data'
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    networks:
+      pleasework:
+        ipv4_address: 172.23.0.12
+
+  adminer:
+    image: adminer
+    restart: always
+    depends_on:
+      - db
+    ports:
+      - '8093:8080'
+    environment:
+      ADMINER_PLUGINS: tables-filter tinymce
+    networks:
+      pleasework:
+        ipv4_address: 172.23.0.13
+
+  housekeeper:
+    image: relay_housekeeper
+    environment:
+      - GENESIS_FORK_VERSION=0x20000089
+      - GENESIS_VALIDATORS_ROOT=0x83431ec7fcf92cfc44947fc0418e831c25e1d0806590231c439830db7ad54fda
+      - BELLATRIX_FORK_VERSION=0x20000091
+      - CAPELLA_FORK_VERSION=0x20000092
+      - DENEB_FORK_VERSION=0x20000093
+      - REDIS_URI=172.23.0.10:6379
+    depends_on:
+      - redis
+      - memcached
+      - db
+      - adminer
+    # volumes:
+    #   - ./vendor:/go/src/app/vendor/
+    networks:
+      pleasework:
+        ipv4_address: 172.23.0.14
+
+  api:
+    image: relay_api_tc
+    environment:
+      - GENESIS_FORK_VERSION=0x20000089
+      - GENESIS_VALIDATORS_ROOT=0x83431ec7fcf92cfc44947fc0418e831c25e1d0806590231c439830db7ad54fda
+      - BELLATRIX_FORK_VERSION=0x20000091
+      - CAPELLA_FORK_VERSION=0x20000092
+      - DENEB_FORK_VERSION=0x20000093
+      - SKIP_RELAY_SIGNATURE_CHECK=1
+      - SHOW_CONFIG_DETAILS=1
+      - MEMCACHED_URIS=172.23.0.11:11211
+    cap_add:
+      - NET_ADMIN
+    depends_on:
+      - redis
+      - memcached
+      - db
+      - adminer
+    ports:
+      - 9062:9062
+    # volumes:
+    #   - ./vendor:/go/src/app/vendor/
+    networks:
+      pleasework:
+        ipv4_address: 172.23.0.15
+
+  website:
+    image: relay_website
+    environment:
+      - GENESIS_FORK_VERSION=0x20000089
+      - GENESIS_VALIDATORS_ROOT=0x83431ec7fcf92cfc44947fc0418e831c25e1d0806590231c439830db7ad54fda
+      - BELLATRIX_FORK_VERSION=0x20000091
+      - CAPELLA_FORK_VERSION=0x20000092
+      - DENEB_FORK_VERSION=0x20000093
+      - REDIS_URI=172.23.0.10:6379
+    depends_on:
+      - redis
+      - memcached
+      - db
+      - adminer
+    ports:
+      - 9060:9060
+    # volumes:
+    #   - ./vendor:/go/src/app/vendor/
+    networks:
+      pleasework:
+        ipv4_address: 172.23.0.16
+
+networks:
+  pleasework:
+    external: true
